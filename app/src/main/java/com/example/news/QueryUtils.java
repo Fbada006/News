@@ -7,6 +7,14 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -14,6 +22,8 @@ import java.util.List;
  * Helper method related to requesting and receiving news data from Guardian
  */
 public class QueryUtils {
+
+    private static final String TAG = "QueryUtils";
 
     /**
      * Create a private constructor because no one should ever create a {@link QueryUtils} object.
@@ -23,10 +33,115 @@ public class QueryUtils {
     private QueryUtils() {
     }
 
+
+    /*Read Timeout*/
+    private static final int READ_TIMEOUT = 10000;
+
+    /*Connect Timeout*/
+    private static final int CONNECT_TIMEOUT = 10000;
+
+    /**
+     * @param queryUrl is the url to query the Guardian server
+     * @return the list of articles
+     */
+    public static List<News> getArticleData(String queryUrl) {
+        //Create the url
+        URL url = createUrl(queryUrl);
+
+        //Perform a HTTP request to the url and receive a JSON response
+        String jsonResponse = null;
+        try {
+            jsonResponse = makeHttpRequest(url);
+        } catch (IOException e) {
+            Log.e(TAG, "Problem making the HTTP request", e);
+        }
+
+        //Get the list of articles
+        return extractFeatureFromJson(jsonResponse);
+    }
+
+    /**
+     * Make an HTTP request to the given URL and return a String as the response.
+     */
+    private static String makeHttpRequest(URL url) throws IOException {
+        //Initialize a string for the JSON response from the Guardian server
+        String jsonResponseFromGuardian = "";
+
+        //Make sure the url is not null.
+        if (url == null) {
+            return jsonResponseFromGuardian;
+        }
+
+        HttpURLConnection urlConnection = null;
+        InputStream inputStream = null;
+
+        //Try making a connection
+        try {
+            urlConnection = (HttpURLConnection) url.openConnection();
+            urlConnection.setReadTimeout(READ_TIMEOUT);
+            urlConnection.setConnectTimeout(CONNECT_TIMEOUT);
+            urlConnection.setRequestMethod("GET");
+            urlConnection.connect();
+
+            //Check if the request was successful. If it is, read the input stream
+            if (urlConnection.getResponseCode() == HttpURLConnection.HTTP_OK) {
+                inputStream = urlConnection.getInputStream();
+                jsonResponseFromGuardian = readFromInputStream(inputStream);
+            } else {
+                Log.e(TAG, "Error response code: " + urlConnection.getResponseCode());
+            }
+
+        } catch (IOException e) {
+            Log.e(TAG, "Error retrieving JSON data from the Guardian server: ", e);
+        } finally {
+            if (urlConnection != null) {
+                urlConnection.disconnect();
+            }
+            if (inputStream != null) {
+                inputStream.close();
+            }
+        }
+
+        return jsonResponseFromGuardian;
+    }
+
+    /**
+     * Returns new URL object from the given string URL.
+     */
+    private static URL createUrl(String stringUrl) {
+        URL url = null;
+        try {
+            url = new URL(stringUrl);
+        } catch (MalformedURLException e) {
+            Log.e(TAG, "Error with creating URL ", e);
+        }
+        return url;
+    }
+
+    /**
+     * Convert the {@link InputStream} into a String which contains the
+     * whole JSON response from the server.
+     */
+    private static String readFromInputStream(InputStream inputStream) throws IOException {
+        StringBuilder output = new StringBuilder();
+
+        //Make sure the input stream is not null before proceeding
+        if (inputStream != null) {
+            InputStreamReader inputStreamReader = new InputStreamReader(inputStream, Charset.forName("UTF-8"));
+            BufferedReader bufferedReader = new BufferedReader(inputStreamReader);
+            String line = bufferedReader.readLine();
+            while (line != null) {
+                output.append(line);
+                line = bufferedReader.readLine();
+            }
+        }
+        return output.toString();
+    }
+
     /**
      * Return a list of {@link News} objects that has been built up from parsing a JSON response.
      */
-    public static List<News> extractFeatureFromJson(String newsData){
+    public static List<News> extractFeatureFromJson(String newsData) {
         //  If the JSON string is empty of null, then return early.
         if (TextUtils.isEmpty(newsData)) {
             return null;
@@ -82,12 +197,12 @@ public class QueryUtils {
                 String author = currentTag.getString("webTitle");
 
                 //  Create a new NEws object with thumbnail, webTitle, author, sectionName, time and url from the JSON response
-                News newsObject = new News (thumbnail, webTitle, author, sectionName, time, url);
+                News newsObject = new News(thumbnail, webTitle, author, sectionName, time, url);
 
                 //  Add the new News object to the list of news.
                 news.add(newsObject);
             }
-        }   catch (JSONException e){
+        } catch (JSONException e) {
             Log.e("QueryUtils", "Problem parsing the news JSON results", e);
         }
 

@@ -1,12 +1,12 @@
 package com.example.news;
 
-import androidx.appcompat.app.AppCompatActivity;
-
-import android.net.Uri;
 import android.os.Bundle;
 import android.widget.ListView;
 
+import androidx.appcompat.app.AppCompatActivity;
+
 import java.util.ArrayList;
+import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -30,7 +30,7 @@ public class MainActivity extends AppCompatActivity {
 //        uriBuilder.appendQueryParameter("page-size", "10");
 
         //  Get the list of news from {@link QueryUtils}
-        ArrayList<News> news = (ArrayList) QueryUtils.extractFeatureFromJson(GUARDIAN_URL);
+        ArrayList<News> news = (ArrayList<News>) QueryUtils.getArticleData(GUARDIAN_URL);
 
         NewsAdapter newsAdapterObject = new NewsAdapter(this, news);
 
